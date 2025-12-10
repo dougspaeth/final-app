@@ -1,95 +1,119 @@
 // src/components/PokemonSearch.jsx
-
 import React, { useState } from 'react';
-import { fetchPokemonData } from '../services/pokeapi';
-import { savePokemonToTeam } from '../services/firestore'; // Will create this next
-import { useAuth } from './AuthContext'; // To get the user's ID
+import { useAuth } from './AuthContext';
+import { savePokemonToTeam } from '../services/firestore'; 
 
 const PokemonSearch = () => {
-  const { currentUser } = useAuth(); // Needed to associate the team sheet with the user
-  const [pokemonName, setPokemonName] = useState('');
-  const [pokemonData, setPokemonData] = useState(null);
+  const [query, setQuery] = useState('');
+  const [pokemon, setPokemon] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
-  const [saveMessage, setSaveMessage] = useState('');
+  const [error, setError] = useState(null);
+  const { currentUser } = useAuth();
 
-  // 1. Function to handle the API call
-  const handleSearch = async (e) => {
-    e.preventDefault();
+  const searchPokemon = async () => {
+    if (!query) return;
     setLoading(true);
-    setError('');
-    setPokemonData(null);
-    setSaveMessage('');
+    setError(null);
+    setPokemon(null);
 
     try {
-      const data = await fetchPokemonData(pokemonName);
-      setPokemonData(data);
+      const response = await fetch(`https://pokeapi.co/api/v2/pokemon/${query.toLowerCase()}`);
+      if (!response.ok) {
+        throw new Error('Pokémon not found');
+      }
+      const data = await response.json();
+      
+      // We format the data immediately so it's ready to display AND save
+      setPokemon({
+        id: crypto.randomUUID(), // Generate a unique ID for the database
+        name: data.name,
+        sprite: data.sprites.front_default,
+        stats: data.stats,
+        // 👇 CRITICAL FIX: We must capture the moves list here!
+        moves: data.moves.map(m => ({ 
+            name: m.move.name, 
+            url: m.move.url 
+        })),
+        selectedMoves: [null, null, null, null] // Initialize empty slots
+      });
     } catch (err) {
-      setError(err.message || 'Failed to fetch Pokémon data.');
+      setError(err.message);
     } finally {
-      setLoading(false); // Helpful feedback is required
+      setLoading(false);
     }
   };
 
-  // 2. Function to handle saving to Firestore
-  const handleSave = async () => {
-    if (!currentUser || !pokemonData) return;
+  const handleAddToTeam = async () => {
+    if (!pokemon || !currentUser) return;
 
     try {
-      // We only save the essential data, not the massive API response
-      const pokemonToSave = {
-        name: pokemonData.name,
-        stats: pokemonData.stats.map(s => ({ 
-            name: s.stat.name, 
-            base_stat: s.base_stat 
-        })),
-        sprite: pokemonData.sprites.front_default,
-        timestamp: new Date()
-      };
-      
-      await savePokemonToTeam(currentUser.uid, pokemonToSave);
-      setSaveMessage(`Successfully added ${pokemonData.name} to your team sheet!`);
-    } catch (err) {
-      setSaveMessage(`Failed to save: ${err.message}`);
+      // Pass the ENTIRE pokemon object, which now includes the 'moves' array
+      await savePokemonToTeam(currentUser.uid, pokemon);
+      alert(`${pokemon.name.toUpperCase()} added to your team!`);
+      setPokemon(null); // Clear search after adding
+      setQuery('');
+    } catch (error) {
+      console.error("Error adding to team:", error);
+      alert("Failed to add Pokémon. Check console.");
     }
   };
 
   return (
-    <div>
+    <div style={{ textAlign: 'center', padding: '20px', color: 'white' }}>
       <h2>Pokémon Search & Team Builder</h2>
-      <form onSubmit={handleSearch}>
-        <input
-          type="text"
-          value={pokemonName}
-          onChange={(e) => setPokemonName(e.target.value)}
-          placeholder="Enter Pokémon name or ID"
-          required
+      
+      <div style={{ marginBottom: '20px' }}>
+        <input 
+          type="text" 
+          value={query} 
+          onChange={(e) => setQuery(e.target.value)} 
+          placeholder="Enter Pokémon Name (e.g. pikachu)" 
+          style={{ padding: '10px', width: '200px', marginRight: '10px' }}
         />
-        <button type="submit" disabled={loading}>
-          {loading ? 'Searching...' : 'Search Pokémon'}
+        <button onClick={searchPokemon} style={{ padding: '10px 20px', cursor: 'pointer' }}>
+          Search Pokémon
         </button>
-      </form>
+      </div>
 
-      {error && <p style={{ color: 'red' }}>Error: {error}</p>}
+      {loading && <p>Loading...</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
 
-      {pokemonData && (
-        <div style={{ border: '1px solid #ccc', padding: '15px', marginTop: '20px' }}>
-          <h3>{pokemonData.name.toUpperCase()}</h3>
-          <img src={pokemonData.sprites.front_default} alt={pokemonData.name} />
+      {pokemon && (
+        <div style={{ 
+            backgroundColor: 'white', 
+            color: 'black', 
+            padding: '20px', 
+            borderRadius: '8px', 
+            maxWidth: '400px', 
+            margin: '0 auto' 
+        }}>
+          <h3>{pokemon.name.toUpperCase()}</h3>
+          <img src={pokemon.sprite} alt={pokemon.name} width="100" />
           
           <h4>Base Stats:</h4>
-          <ul>
-            {pokemonData.stats.map((s, index) => (
-              <li key={index}>
-                **{s.stat.name}:** {s.base_stat}
+          <ul style={{ listStyle: 'none', padding: 0 }}>
+            {pokemon.stats.map((s) => (
+              <li key={s.stat.name}>
+                <strong>{s.stat.name.toUpperCase()}:</strong> {s.base_stat}
               </li>
             ))}
           </ul>
-          
-          <button onClick={handleSave} disabled={!currentUser}>
+
+          <button 
+            onClick={handleAddToTeam}
+            style={{ 
+                marginTop: '15px', 
+                backgroundColor: '#28a745', 
+                color: 'white', 
+                border: 'none', 
+                padding: '10px 20px', 
+                fontSize: '16px', 
+                cursor: 'pointer',
+                borderRadius: '5px'
+            }}
+          >
             Add to Team Sheet
           </button>
-          {saveMessage && <p style={{ color: 'green', marginTop: '10px' }}>{saveMessage}</p>}
         </div>
       )}
     </div>
