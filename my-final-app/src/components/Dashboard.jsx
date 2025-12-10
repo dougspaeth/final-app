@@ -4,21 +4,16 @@ import React, { useState, useEffect, useRef } from 'react';
 import { signOut } from 'firebase/auth';
 import { auth } from './firebase-config';
 import { useAuth } from './AuthContext';
-// Import generic update and delete functions from firestore service
+// Import the generic update and delete functions
 import { listenForTeam, updatePokemonFields, deletePokemon } from '../services/firestore';
 import PokemonSearch from './PokemonSearch';
 
 const Dashboard = () => {
   const { currentUser } = useAuth();
-  
-  // State for the team list and loading status
   const [savedTeam, setSavedTeam] = useState([]);
   const [teamLoading, setTeamLoading] = useState(true);
   
-  // State for the currently selected Pokémon (for the details panel)
   const [selectedTeamPokemon, setSelectedTeamPokemon] = useState(null); 
-  
-  // State for the active move slot (0-3)
   const [activeMoveSlotIndex, setActiveMoveSlotIndex] = useState(0); 
 
   // REF: Tracks the ID of the selected Pokémon to handle updates without causing loops
@@ -30,7 +25,7 @@ const Dashboard = () => {
   }, [selectedTeamPokemon]);
 
 
-  // --- 1. REAL-TIME LISTENER ---
+  // --- 1. REAL-TIME LISTENER (Optimized) ---
   useEffect(() => {
     if (currentUser?.uid) {
       setTeamLoading(true);
@@ -59,7 +54,7 @@ const Dashboard = () => {
       });
       return () => unsubscribe(); 
     }
-  }, [currentUser]); 
+  }, [currentUser]); // Dependency array is minimal to prevent re-subscriptions
 
 
   // --- 2. HANDLERS ---
@@ -76,10 +71,10 @@ const Dashboard = () => {
   const handleTeamPokemonClick = (pokemon) => {
     setSelectedTeamPokemon(pokemon);
     
-    // Defensive Check: Ensure movesArray is valid, even for old data
+    // Defensive Check: Ensure movesArray is valid
     const movesArray = pokemon.selectedMoves || [null, null, null, null];
     
-    // Find the first empty slot to be helpful
+    // Find the first empty slot
     const firstEmptySlot = movesArray.findIndex(m => m === null);
     setActiveMoveSlotIndex(firstEmptySlot !== -1 ? firstEmptySlot : 0);
   };
@@ -96,7 +91,6 @@ const Dashboard = () => {
     const currentMoves = [...(selectedTeamPokemon.selectedMoves || [null, null, null, null])];
 
     // 2. Check for Duplicates
-    // We use sm?.name to safely check properties even if a slot is null
     const isAlreadySelected = currentMoves.some(m => m && m.name === move.name);
     if (isAlreadySelected) {
         alert(`${move.name.toUpperCase()} is already selected!`);
@@ -117,7 +111,7 @@ const Dashboard = () => {
             selectedTeamPokemon.id, 
             fieldToUpdate
         );
-        // Advance to next slot automatically
+        // Advance to next slot
         setActiveMoveSlotIndex((activeMoveSlotIndex + 1) % 4); 
     } catch (error) {
         console.error("Error assigning move:", error);
@@ -198,7 +192,7 @@ const Dashboard = () => {
                       border: selectedTeamPokemon?.id === p.id ? '2px solid #28a745' : '1px solid #ccc', 
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      backgroundColor: selectedTeamPokemon?.id === p.id ? '#d4edda' : '#fff', 
+                      backgroundColor: selectedTeamPokemon?.id === p.id ? '#7393B3' : '#36454F', 
                       marginBottom: '8px',
                       display: 'flex',
                       alignItems: 'center',
@@ -216,16 +210,13 @@ const Dashboard = () => {
         {/* RIGHT COLUMN: DETAILS OR SEARCH */}
         <div>
           {selectedTeamPokemon ? (
-            <div style={{ border: '1px solid #ccc', padding: '15px', marginTop: '20px', backgroundColor: '#e9f7ff' }}>
-              
-              {/* Top Right Close Button */}
+            <div style={{ border: '1px solid #ccc', padding: '15px', marginTop: '20px', backgroundColor: '#36454F' }}>
               <button 
                 onClick={() => setSelectedTeamPokemon(null)} 
                 style={{ float: 'right', cursor: 'pointer', border: 'none', background: 'transparent', fontWeight: 'bold' }}
               >
                 X
               </button>
-
               <h3>{selectedTeamPokemon.name.toUpperCase()}</h3>
               <img src={selectedTeamPokemon.sprite} alt={selectedTeamPokemon.name} />
               
@@ -240,7 +231,7 @@ const Dashboard = () => {
                               padding: '10px', 
                               border: activeMoveSlotIndex === index ? '2px solid #ffc107' : '1px solid #ccc',
                               borderRadius: '4px', 
-                              backgroundColor: move ? '#d4edda' : '#f8f9fa', 
+                              backgroundColor: move ? '#36454F' : '#818589', 
                               display: 'flex', 
                               justifyContent: 'space-between', 
                               alignItems: 'center',
@@ -309,15 +300,6 @@ const Dashboard = () => {
               >
                 Remove Pokémon 🗑️
               </button>
-
-              {/* Bottom Close Button */}
-              <button 
-                onClick={() => setSelectedTeamPokemon(null)} 
-                style={{ marginTop: '20px', marginLeft: '10px', padding: '10px 20px', cursor: 'pointer' }}
-              >
-                Close Details
-              </button>
-
             </div>
           ) : (
             <PokemonSearch />
