@@ -266,7 +266,7 @@ const Dashboard = () => {
                   ))}
               </div>
 
-              <details style={{ marginTop: '20px', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+              <details open style={{ marginTop: '20px', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
                   <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
                       Select a Move (Assign to Slot {activeMoveSlotIndex + 1})
                   </summary>
