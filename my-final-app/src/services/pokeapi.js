@@ -1,4 +1,5 @@
 // src/services/pokeapi.js
+import { db } from '../components/firebase-config';
 
 const BASE_URL = 'https://pokeapi.co/api/v2/pokemon/';
 
