@@ -163,7 +163,8 @@ const Dashboard = () => {
             <p>Your team is empty. Search to add Pokémon.</p>
           ) : (
             <div>
-              {savedTeam.map((p) => (
+              {/* FIX: Filter out null/undefined items first */}
+              {savedTeam.filter(Boolean).map((p) => (
                 <div 
                   key={p.id} 
                   onClick={() => handleTeamPokemonClick(p)} 
@@ -172,7 +173,6 @@ const Dashboard = () => {
                       border: selectedTeamPokemon?.id === p.id ? '2px solid #28a745' : '1px solid #ccc', 
                       borderRadius: '4px',
                       cursor: 'pointer',
-                      // Highlight active pokemon with Blue, others white
                       backgroundColor: selectedTeamPokemon?.id === p.id ? '#7393B3' : '#fff', 
                       color: selectedTeamPokemon?.id === p.id ? 'white' : 'black',
                       marginBottom: '8px',
@@ -181,8 +181,9 @@ const Dashboard = () => {
                       gap: '10px'
                   }}
                 >
-                  <img src={p.sprite} alt={p.name} width="50"/>
-                  <strong>{p.name.toUpperCase()}</strong>
+                  {/* FIX: Use optional chaining (?.) just in case */}
+                  <img src={p?.sprite} alt={p?.name} width="50"/>
+                  <strong>{p?.name?.toUpperCase()}</strong>
                 </div>
               ))}
             </div>
