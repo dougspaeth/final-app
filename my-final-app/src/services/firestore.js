@@ -1,7 +1,6 @@
 // src/services/firestore.js
 
 import { db } from '../components/firebase-config'; 
-// All Firestore imports in one place
 import { 
   collection, 
   addDoc, 
@@ -39,7 +38,8 @@ export const listenForTeam = (userId, callback) => {
   const unsubscribe = onSnapshot(q, (snapshot) => {
     const team = [];
     snapshot.forEach((doc) => {
-      team.push({ id: doc.id, ...doc.data() }); 
+      // 👇 FIX IS HERE: We spread data FIRST, then overwrite 'id' with the real doc.id
+      team.push({ ...doc.data(), id: doc.id }); 
     });
     callback(team); 
   }, (error) => {
@@ -49,11 +49,14 @@ export const listenForTeam = (userId, callback) => {
   return unsubscribe;
 };
 
-// 3. UPDATE POKÉMON FIELDS (Correct Name)
+// 3. UPDATE POKÉMON FIELDS
 export const updatePokemonFields = async (userId, pokemonId, updates) => {
   if (!userId || !pokemonId) {
     throw new Error("User ID and Pokémon ID are required for update.");
   }
+
+  // Debugging log to ensure we are using the correct ID
+  console.log(`Attempting to update doc: users/${userId}/teamsheet/${pokemonId}`);
 
   const docRef = doc(db, 'users', userId, 'teamsheet', pokemonId);
 
