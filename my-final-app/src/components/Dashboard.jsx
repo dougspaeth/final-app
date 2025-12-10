@@ -209,22 +209,28 @@ const Dashboard = () => {
                 X
               </button>
 
-              <h3>{selectedTeamPokemon.name.toUpperCase()}</h3>
+              <h3>{selectedTeamPokemon.name?.toUpperCase() || 'UNKNOWN POKÉMON'}</h3>
               <img src={selectedTeamPokemon.sprite} alt={selectedTeamPokemon.name} />
 
+              {/* FIXED BASE STATS SECTION WITH OPTIONAL CHAINING */}
               <h4>Base Stats:</h4>
               <ul style={{ listStyleType: 'none', padding: 0 }}>
-                {/* SAFE CHECK: (stats || []) to prevent crashing if data is missing */}
-                {(selectedTeamPokemon.stats || []).map((s, index) => (
-                  <li key={index}>
-                    <strong>{s.stat.name.toUpperCase()}:</strong> {s.base_stat}
-                  </li>
-                ))}
+                {(selectedTeamPokemon.stats || [])
+                  .filter(stat => stat && stat.stat) // Filter out any null/undefined stats
+                  .map((s, index) => {
+                    const statName = s.stat?.name || 'unknown';
+                    const baseStat = s.base_stat || 0;
+                    return (
+                      <li key={index}>
+                        <strong>{statName.toUpperCase()}:</strong> {baseStat}
+                      </li>
+                    );
+                  })}
               </ul>
               
               <h4 style={{ marginTop: '20px' }}>Current Moveset:</h4>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
-                  {/* SAFE CHECK: (selectedMoves || [null...]) */}
+                  {/* SAFE CHECK: (selectedMoves || [null...]) with optional chaining */}
                   {(selectedTeamPokemon.selectedMoves || [null, null, null, null]).map((move, index) => (
                       <div 
                           key={index} 
@@ -243,7 +249,7 @@ const Dashboard = () => {
                           onClick={() => handleSlotSelect(index)}
                       >
                           <strong style={{ fontWeight: activeMoveSlotIndex === index ? 'bold' : 'normal' }}>
-                              SLOT {index + 1}: {move?.name.toUpperCase() || 'EMPTY'}
+                              SLOT {index + 1}: {move?.name?.toUpperCase() || 'EMPTY'}
                           </strong>
                           {move && (
                               <button 
@@ -265,14 +271,19 @@ const Dashboard = () => {
                       Select a Move (Assign to Slot {activeMoveSlotIndex + 1})
                   </summary>
                   <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '10px' }}>
-                      {/* SAFE CHECK: (moves || []) */}
-                      {(selectedTeamPokemon.moves || []).map((m) => {
+                      {/* SAFE CHECK: (moves || []) with null filtering */}
+                      {(selectedTeamPokemon.moves || [])
+                        .filter(m => m) // Filter out any null moves
+                        .map((m, index) => {
+                          // Skip if move has no name
+                          if (!m.name) return null;
+                          
                           const isAlreadySelected = (selectedTeamPokemon.selectedMoves || [])
                                                       .some(sm => sm?.name === m.name);
 
                           return (
                               <button 
-                                  key={m.name} 
+                                  key={m.name || index} 
                                   onClick={() => handleMoveAssignment(m)} 
                                   disabled={isAlreadySelected}
                                   style={{
@@ -283,7 +294,7 @@ const Dashboard = () => {
                                       margin: '2px 0',
                                       border: '1px solid transparent',
                                       borderRadius: '4px',
-                                      cursor: 'pointer',
+                                      cursor: isAlreadySelected ? 'not-allowed' : 'pointer',
                                       backgroundColor: isAlreadySelected ? '#007bff' : 'white',
                                       color: isAlreadySelected ? 'white' : 'black',
                                       fontWeight: isAlreadySelected ? 'bold' : 'normal'
