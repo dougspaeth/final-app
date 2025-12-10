@@ -78,21 +78,55 @@ const Dashboard = () => {
     setActiveMoveSlotIndex(index);
   };
 
+  // Helper function to extract move name from different structures
+  const getMoveName = (move) => {
+    if (!move) return null;
+    return move.name || (move.move && move.move.name) || 'Unknown';
+  };
+
+  // Helper function to normalize move object for saving
+  const normalizeMoveForSave = (move) => {
+    if (!move) return null;
+    // If move has a nested structure, flatten it for saving
+    if (move.move && move.move.name) {
+      return {
+        name: move.move.name,
+        originalData: move // Keep original data if needed
+      };
+    }
+    return move; // Already flattened
+  };
+
   const handleMoveAssignment = async (move) => {
     if (!currentUser || !selectedTeamPokemon) return;
 
     // Create a copy of the moves array
     const currentMoves = [...(selectedTeamPokemon.selectedMoves || [null, null, null, null])];
 
-    // Check for duplicates
-    const isAlreadySelected = currentMoves.some(m => m && m.name === move.name);
+    // Extract move name using helper
+    const moveName = getMoveName(move);
+    if (!moveName) {
+      alert('Invalid move data');
+      return;
+    }
+
+    // Check for duplicates by name
+    const isAlreadySelected = currentMoves.some(m => {
+      if (!m) return false;
+      const existingMoveName = getMoveName(m);
+      return existingMoveName === moveName;
+    });
+    
     if (isAlreadySelected) {
-        alert(`${move.name.toUpperCase()} is already selected!`);
+        alert(`${moveName.toUpperCase()} is already selected!`);
         return;
     }
 
+    // Normalize move for consistent storage
+    const normalizedMove = normalizeMoveForSave(move);
+    
     // Assign move to the active slot
-    currentMoves[activeMoveSlotIndex] = move;
+    currentMoves[activeMoveSlotIndex] = normalizedMove;
 
     try {
         await updatePokemonFields(
@@ -141,49 +175,214 @@ const Dashboard = () => {
     }
   };
 
+  // Function to render moves list (handles different data structures)
+  const renderMovesList = () => {
+    if (!selectedTeamPokemon?.moves || selectedTeamPokemon.moves.length === 0) {
+      return (
+        <p style={{ color: 'white', textAlign: 'center', padding: '10px' }}>
+          No moves available for this Pokémon.
+          <br />
+          <small>This might be because moves weren't saved when adding the Pokémon.</small>
+        </p>
+      );
+    }
+
+    // Debug log to see what moves data looks like
+    console.log("Moves data:", selectedTeamPokemon.moves);
+
+    return selectedTeamPokemon.moves
+      .filter(moveItem => {
+        // Filter out null/undefined items
+        if (!moveItem) return false;
+        
+        // Check if this item has any move data
+        const hasMoveData = moveItem.name || 
+                          (moveItem.move && moveItem.move.name) ||
+                          (typeof moveItem === 'string');
+        return hasMoveData;
+      })
+      .map((moveItem, index) => {
+        // Extract move name based on structure
+        let moveName = '';
+        let moveObject = moveItem;
+        
+        if (typeof moveItem === 'string') {
+          moveName = moveItem;
+          moveObject = { name: moveItem };
+        } else if (moveItem.move && moveItem.move.name) {
+          // PokeAPI nested structure: { move: { name: "tackle", url: "..." } }
+          moveName = moveItem.move.name;
+          moveObject = moveItem;
+        } else if (moveItem.name) {
+          // Flat structure: { name: "tackle" }
+          moveName = moveItem.name;
+          moveObject = moveItem;
+        } else {
+          return null; // Skip if no recognizable structure
+        }
+
+        // Check if move is already selected
+        const isAlreadySelected = (selectedTeamPokemon.selectedMoves || [])
+          .some(selectedMove => {
+            if (!selectedMove) return false;
+            const selectedMoveName = getMoveName(selectedMove);
+            return selectedMoveName === moveName;
+          });
+
+        return (
+          <button 
+            key={`${moveName}-${index}`}
+            onClick={() => handleMoveAssignment(moveObject)}
+            disabled={isAlreadySelected}
+            style={{
+              display: 'block',
+              width: '100%',
+              textAlign: 'left',
+              padding: '8px',
+              margin: '4px 0',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              cursor: isAlreadySelected ? 'not-allowed' : 'pointer',
+              backgroundColor: isAlreadySelected ? '#4a5568' : 'white',
+              color: isAlreadySelected ? '#a0aec0' : 'black',
+              fontWeight: 'normal',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => {
+              if (!isAlreadySelected) {
+                e.target.style.backgroundColor = '#e2e8f0';
+              }
+            }}
+            onMouseLeave={(e) => {
+              if (!isAlreadySelected) {
+                e.target.style.backgroundColor = 'white';
+              }
+            }}
+          >
+            <strong>{moveName.toUpperCase()}</strong>
+            {isAlreadySelected && <span style={{ float: 'right', color: '#ff6b6b' }}>✓ TAKEN</span>}
+          </button>
+        );
+      });
+  };
 
   // --- 3. RENDERING ---
   return (
-    <div style={{ padding: '20px', fontFamily: 'sans-serif' }}>
-      <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <h1>Welcome, Trainer {currentUser?.email}!</h1>
-        <button onClick={handleLogout}>Log Out</button>
+    <div style={{ padding: '20px', fontFamily: 'sans-serif', backgroundColor: '#f0f4f8', minHeight: '100vh' }}>
+      <header style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center',
+        padding: '20px',
+        backgroundColor: '#2d3748',
+        color: 'white',
+        borderRadius: '10px',
+        marginBottom: '30px'
+      }}>
+        <h1 style={{ margin: 0 }}>Welcome, Trainer {currentUser?.email}!</h1>
+        <button 
+          onClick={handleLogout}
+          style={{
+            padding: '10px 20px',
+            backgroundColor: '#e53e3e',
+            color: 'white',
+            border: 'none',
+            borderRadius: '5px',
+            cursor: 'pointer',
+            fontWeight: 'bold'
+          }}
+        >
+          Log Out
+        </button>
       </header>
 
       <section style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '40px', marginTop: '30px' }}>
         
         {/* LEFT COLUMN: TEAM LIST */}
         <div>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <h2>My Current Team ({savedTeam.length} / 6)</h2>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'space-between', 
+            alignItems: 'center',
+            marginBottom: '20px'
+          }}>
+            <h2 style={{ color: '#2d3748' }}>My Current Team ({savedTeam.length} / 6)</h2>
           </div>
           {teamLoading ? (
-            <p>Loading...</p>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px',
+              backgroundColor: 'white',
+              borderRadius: '10px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+            }}>
+              <p>Loading your team...</p>
+            </div>
           ) : savedTeam.length === 0 ? (
-            <p>Your team is empty. Search to add Pokémon.</p>
+            <div style={{ 
+              textAlign: 'center', 
+              padding: '40px',
+              backgroundColor: 'white',
+              borderRadius: '10px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+            }}>
+              <p style={{ fontSize: '18px', color: '#4a5568' }}>Your team is empty. Search to add Pokémon.</p>
+            </div>
           ) : (
-            <div>
-              {/* FIX: Filter out null/undefined items first */}
+            <div style={{
+              backgroundColor: 'white',
+              borderRadius: '10px',
+              padding: '20px',
+              boxShadow: '0 2px 10px rgba(0,0,0,0.1)'
+            }}>
               {savedTeam.filter(Boolean).map((p) => (
                 <div 
                   key={p.id} 
                   onClick={() => handleTeamPokemonClick(p)} 
                   style={{ 
-                      padding: '10px', 
-                      border: selectedTeamPokemon?.id === p.id ? '2px solid #28a745' : '1px solid #ccc', 
-                      borderRadius: '4px',
+                      padding: '15px', 
+                      border: selectedTeamPokemon?.id === p.id ? '3px solid #48bb78' : '1px solid #e2e8f0', 
+                      borderRadius: '8px',
                       cursor: 'pointer',
-                      backgroundColor: selectedTeamPokemon?.id === p.id ? '#7393B3' : '#fff', 
-                      color: selectedTeamPokemon?.id === p.id ? 'white' : 'black',
-                      marginBottom: '8px',
+                      backgroundColor: selectedTeamPokemon?.id === p.id ? '#4299e1' : '#f7fafc', 
+                      color: selectedTeamPokemon?.id === p.id ? 'white' : '#2d3748',
+                      marginBottom: '12px',
                       display: 'flex',
                       alignItems: 'center',
-                      gap: '10px'
+                      gap: '15px',
+                      transition: 'all 0.3s',
+                      transform: selectedTeamPokemon?.id === p.id ? 'translateX(5px)' : 'none'
+                  }}
+                  onMouseEnter={(e) => {
+                    if (selectedTeamPokemon?.id !== p.id) {
+                      e.currentTarget.style.backgroundColor = '#edf2f7';
+                      e.currentTarget.style.transform = 'translateX(5px)';
+                    }
+                  }}
+                  onMouseLeave={(e) => {
+                    if (selectedTeamPokemon?.id !== p.id) {
+                      e.currentTarget.style.backgroundColor = '#f7fafc';
+                      e.currentTarget.style.transform = 'none';
+                    }
                   }}
                 >
-                  {/* FIX: Use optional chaining (?.) just in case */}
-                  <img src={p?.sprite} alt={p?.name} width="50"/>
-                  <strong>{p?.name?.toUpperCase()}</strong>
+                  <img 
+                    src={p?.sprite} 
+                    alt={p?.name} 
+                    style={{ 
+                      width: '60px', 
+                      height: '60px',
+                      backgroundColor: selectedTeamPokemon?.id === p.id ? 'rgba(255,255,255,0.2)' : '#e2e8f0',
+                      borderRadius: '8px',
+                      padding: '5px'
+                    }}
+                  />
+                  <div>
+                    <strong style={{ fontSize: '18px' }}>{p?.name?.toUpperCase()}</strong>
+                    <div style={{ fontSize: '14px', color: selectedTeamPokemon?.id === p.id ? '#cbd5e0' : '#718096' }}>
+                      Click to view details
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
@@ -194,132 +393,245 @@ const Dashboard = () => {
         <div>
           {selectedTeamPokemon ? (
             <div style={{ 
-                border: '1px solid #ccc', 
-                padding: '15px', 
-                marginTop: '20px', 
-                // Dark Theme Background & Text
-                backgroundColor: '#36454F', 
-                color: 'white' 
+                border: '2px solid #4299e1', 
+                padding: '25px', 
+                borderRadius: '12px',
+                backgroundColor: '#2d3748', 
+                color: 'white',
+                boxShadow: '0 4px 20px rgba(0,0,0,0.2)'
             }}>
               
               <button 
                 onClick={() => setSelectedTeamPokemon(null)} 
-                style={{ float: 'right', cursor: 'pointer', border: 'none', background: 'transparent', fontWeight: 'bold', color: 'white' }}
+                style={{ 
+                  float: 'right', 
+                  cursor: 'pointer', 
+                  border: 'none', 
+                  background: '#4a5568',
+                  fontWeight: 'bold', 
+                  color: 'white',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '50%',
+                  fontSize: '20px'
+                }}
               >
-                X
+                ×
               </button>
 
-              <h3>{selectedTeamPokemon.name?.toUpperCase() || 'UNKNOWN POKÉMON'}</h3>
-              <img src={selectedTeamPokemon.sprite} alt={selectedTeamPokemon.name} />
+              <div style={{ display: 'flex', alignItems: 'center', gap: '20px', marginBottom: '25px' }}>
+                <img 
+                  src={selectedTeamPokemon.sprite} 
+                  alt={selectedTeamPokemon.name} 
+                  style={{ 
+                    width: '120px', 
+                    height: '120px',
+                    backgroundColor: '#4a5568',
+                    borderRadius: '12px',
+                    padding: '10px'
+                  }}
+                />
+                <div>
+                  <h3 style={{ fontSize: '28px', margin: '0 0 10px 0', color: '#63b3ed' }}>
+                    {selectedTeamPokemon.name?.toUpperCase() || 'UNKNOWN POKÉMON'}
+                  </h3>
+                  <div style={{ color: '#a0aec0' }}>
+                    ID: {selectedTeamPokemon.id}
+                  </div>
+                </div>
+              </div>
 
-              {/* FIXED BASE STATS SECTION WITH OPTIONAL CHAINING */}
-              <h4>Base Stats:</h4>
-              <ul style={{ listStyleType: 'none', padding: 0 }}>
+              {/* BASE STATS SECTION */}
+              <h4 style={{ color: '#68d391', marginBottom: '15px' }}>Base Stats:</h4>
+              <ul style={{ 
+                listStyleType: 'none', 
+                padding: 0,
+                display: 'grid',
+                gridTemplateColumns: 'repeat(2, 1fr)',
+                gap: '10px',
+                marginBottom: '25px'
+              }}>
                 {(selectedTeamPokemon.stats || [])
-                  .filter(stat => stat && stat.stat) // Filter out any null/undefined stats
+                  .filter(stat => stat && stat.stat)
                   .map((s, index) => {
                     const statName = s.stat?.name || 'unknown';
                     const baseStat = s.base_stat || 0;
                     return (
-                      <li key={index}>
-                        <strong>{statName.toUpperCase()}:</strong> {baseStat}
+                      <li 
+                        key={index}
+                        style={{
+                          backgroundColor: '#4a5568',
+                          padding: '12px',
+                          borderRadius: '8px',
+                          display: 'flex',
+                          justifyContent: 'space-between'
+                        }}
+                      >
+                        <strong style={{ color: '#cbd5e0' }}>{statName.toUpperCase()}:</strong>
+                        <span style={{ 
+                          color: baseStat >= 100 ? '#68d391' : baseStat >= 50 ? '#f6e05e' : '#fc8181',
+                          fontWeight: 'bold'
+                        }}>
+                          {baseStat}
+                        </span>
                       </li>
                     );
                   })}
               </ul>
               
-              <h4 style={{ marginTop: '20px' }}>Current Moveset:</h4>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
-                  {/* SAFE CHECK: (selectedMoves || [null...]) with optional chaining */}
-                  {(selectedTeamPokemon.selectedMoves || [null, null, null, null]).map((move, index) => (
+              {/* MOVESET SECTION */}
+              <h4 style={{ color: '#68d391', marginBottom: '15px' }}>Current Moveset:</h4>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(2, 1fr)', 
+                gap: '12px', 
+                marginBottom: '25px' 
+              }}>
+                  {(selectedTeamPokemon.selectedMoves || [null, null, null, null]).map((move, index) => {
+                    const moveName = getMoveName(move);
+                    const isActiveSlot = activeMoveSlotIndex === index;
+                    
+                    return (
                       <div 
                           key={index} 
                           style={{ 
-                              padding: '10px', 
-                              border: activeMoveSlotIndex === index ? '2px solid #ffc107' : '1px solid #ccc',
-                              borderRadius: '4px', 
-                              // Slot colors for dark mode
-                              backgroundColor: move ? '#7393B3' : '#818589', 
+                              padding: '15px', 
+                              border: isActiveSlot ? '2px solid #f6e05e' : '1px solid #4a5568',
+                              borderRadius: '8px', 
+                              backgroundColor: move ? '#4299e1' : '#4a5568', 
                               color: 'white', 
                               display: 'flex', 
                               justifyContent: 'space-between', 
                               alignItems: 'center',
-                              cursor: 'pointer'
+                              cursor: 'pointer',
+                              transition: 'all 0.2s',
+                              transform: isActiveSlot ? 'scale(1.02)' : 'none'
                           }}
                           onClick={() => handleSlotSelect(index)}
                       >
-                          <strong style={{ fontWeight: activeMoveSlotIndex === index ? 'bold' : 'normal' }}>
-                              SLOT {index + 1}: {move?.name?.toUpperCase() || 'EMPTY'}
-                          </strong>
+                          <div>
+                            <div style={{ 
+                              fontSize: '12px', 
+                              color: move ? '#cbd5e0' : '#a0aec0',
+                              marginBottom: '5px'
+                            }}>
+                              SLOT {index + 1}
+                            </div>
+                            <strong style={{ 
+                              fontWeight: isActiveSlot ? 'bold' : 'normal',
+                              fontSize: '16px'
+                            }}>
+                              {moveName ? moveName.toUpperCase() : 'EMPTY'}
+                            </strong>
+                          </div>
                           {move && (
                               <button 
                                   onClick={(e) => {
                                       e.stopPropagation();
                                       handleMoveRemoval(index);
                                   }}
-                                  style={{ background: 'none', border: 'none', color: '#ffcccb', cursor: 'pointer', fontSize: '1.2em', marginLeft: '10px' }}
+                                  style={{ 
+                                    background: 'none', 
+                                    border: 'none', 
+                                    color: '#fc8181', 
+                                    cursor: 'pointer', 
+                                    fontSize: '24px',
+                                    padding: '0',
+                                    width: '30px',
+                                    height: '30px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                  title="Remove this move"
                               >
                                   &times;
                               </button>
                           )}
                       </div>
-                  ))}
+                    );
+                  })}
               </div>
 
-              <details style={{ marginTop: '20px', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
-                  <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
-                      Select a Move (Assign to Slot {activeMoveSlotIndex + 1})
+              {/* MOVE SELECTION DROPDOWN */}
+              <details 
+                style={{ 
+                  marginTop: '20px', 
+                  border: '1px solid #4a5568', 
+                  padding: '0',
+                  borderRadius: '8px',
+                  overflow: 'hidden'
+                }}
+                open // Keep it open by default for debugging
+              >
+                  <summary style={{ 
+                    cursor: 'pointer', 
+                    fontWeight: 'bold',
+                    padding: '15px',
+                    backgroundColor: '#4a5568',
+                    color: 'white',
+                    listStyle: 'none'
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <span>Select a Move (Assign to Slot {activeMoveSlotIndex + 1})</span>
+                      <span style={{ fontSize: '12px', color: '#a0aec0' }}>▼</span>
+                    </div>
                   </summary>
-                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '10px' }}>
-                      {/* SAFE CHECK: (moves || []) with null filtering */}
-                      {(selectedTeamPokemon.moves || [])
-                        .filter(m => m) // Filter out any null moves
-                        .map((m, index) => {
-                          // Skip if move has no name
-                          if (!m.name) return null;
-                          
-                          const isAlreadySelected = (selectedTeamPokemon.selectedMoves || [])
-                                                      .some(sm => sm?.name === m.name);
-
-                          return (
-                              <button 
-                                  key={m.name || index} 
-                                  onClick={() => handleMoveAssignment(m)} 
-                                  disabled={isAlreadySelected}
-                                  style={{
-                                      display: 'block',
-                                      width: '100%',
-                                      textAlign: 'left',
-                                      padding: '5px',
-                                      margin: '2px 0',
-                                      border: '1px solid transparent',
-                                      borderRadius: '4px',
-                                      cursor: isAlreadySelected ? 'not-allowed' : 'pointer',
-                                      backgroundColor: isAlreadySelected ? '#007bff' : 'white',
-                                      color: isAlreadySelected ? 'white' : 'black',
-                                      fontWeight: isAlreadySelected ? 'bold' : 'normal'
-                                  }}
-                              >
-                                  {m.name.toUpperCase()} {isAlreadySelected ? '(TAKEN)' : ''}
-                              </button>
-                          );
-                      })}
+                  <div style={{ 
+                    maxHeight: '300px', 
+                    overflowY: 'auto', 
+                    padding: '15px',
+                    backgroundColor: '#2d3748'
+                  }}>
+                      {renderMovesList()}
                   </div>
               </details>
               
-              <button 
-                onClick={handleDeletePokemon} 
-                style={{ marginTop: '20px', backgroundColor: '#f44336', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer' }}
-              >
-                Remove Pokémon 🗑️
-              </button>
+              {/* ACTION BUTTONS */}
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'space-between',
+                marginTop: '30px',
+                gap: '15px'
+              }}>
+                <button 
+                  onClick={handleDeletePokemon} 
+                  style={{ 
+                    flex: 1,
+                    backgroundColor: '#fc8181', 
+                    color: 'white', 
+                    border: 'none', 
+                    padding: '15px', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '10px'
+                  }}
+                >
+                  🗑️ Remove Pokémon
+                </button>
 
-              <button 
-                onClick={() => setSelectedTeamPokemon(null)} 
-                style={{ marginTop: '20px', marginLeft: '10px', padding: '10px 20px', cursor: 'pointer', color: 'black' }}
-              >
-                Close Details
-              </button>
+                <button 
+                  onClick={() => setSelectedTeamPokemon(null)} 
+                  style={{ 
+                    flex: 1,
+                    backgroundColor: '#4a5568', 
+                    color: 'white', 
+                    border: 'none',
+                    padding: '15px', 
+                    borderRadius: '8px', 
+                    cursor: 'pointer',
+                    fontWeight: 'bold',
+                    fontSize: '16px'
+                  }}
+                >
+                  Close Details
+                </button>
+              </div>
 
             </div>
           ) : (
