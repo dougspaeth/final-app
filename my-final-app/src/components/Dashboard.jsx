@@ -69,7 +69,101 @@ const Dashboard = () => {
 
         {/* === SEARCH AREA (API Requirement) === */}
         <div>
-          <PokemonSearch />
+          {selectedTeamPokemon ? (
+            <div style={{ border: '1px solid #ccc', padding: '15px', marginTop: '20px', backgroundColor: '#36454F' }}>
+              <button 
+                onClick={() => setSelectedTeamPokemon(null)} 
+                style={{ float: 'right', cursor: 'pointer', border: 'none', background: 'transparent', fontWeight: 'bold' }}
+              >
+                X
+              </button>
+              <h3>{selectedTeamPokemon.name.toUpperCase()}</h3>
+              <img src={selectedTeamPokemon.sprite} alt={selectedTeamPokemon.name} />
+              
+              {/* MOVE SLOTS DISPLAY */}
+              <h4 style={{ marginTop: '20px' }}>Current Moveset:</h4>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '10px', marginBottom: '20px' }}>
+                  {/* Defensive Check: Use || to provide fallback array */}
+                  {(selectedTeamPokemon.selectedMoves || [null, null, null, null]).map((move, index) => (
+                      <div 
+                          key={index} 
+                          style={{ 
+                              padding: '10px', 
+                              border: activeMoveSlotIndex === index ? '2px solid #ffc107' : '1px solid #ccc',
+                              borderRadius: '4px', 
+                              backgroundColor: move ? '#36454F' : '#818589', 
+                              display: 'flex', 
+                              justifyContent: 'space-between', 
+                              alignItems: 'center',
+                              cursor: 'pointer'
+                          }}
+                          onClick={() => handleSlotSelect(index)}
+                      >
+                          <strong style={{ fontWeight: activeMoveSlotIndex === index ? 'bold' : 'normal' }}>
+                              SLOT {index + 1}: {move?.name.toUpperCase() || 'EMPTY'}
+                          </strong>
+                          {move && (
+                              <button 
+                                  onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleMoveRemoval(index);
+                                  }}
+                                  style={{ background: 'none', border: 'none', color: 'red', cursor: 'pointer', fontSize: '1.2em', marginLeft: '10px' }}
+                              >
+                                  &times;
+                              </button>
+                          )}
+                      </div>
+                  ))}
+              </div>
+
+              {/* MOVE SELECTION DROPDOWN */}
+              <details style={{ marginTop: '20px', border: '1px solid #ddd', padding: '10px', borderRadius: '4px' }}>
+                  <summary style={{ cursor: 'pointer', fontWeight: 'bold' }}>
+                      Select a Move (Assign to Slot {activeMoveSlotIndex + 1})
+                  </summary>
+                  <div style={{ maxHeight: '200px', overflowY: 'auto', marginTop: '10px' }}>
+                      {selectedTeamPokemon.moves.map((m) => {
+                          // Defensive Check: Ensure array exists and use optional chaining on 'sm'
+                          const isAlreadySelected = (selectedTeamPokemon.selectedMoves || [])
+                                                      .some(sm => sm?.name === m.name);
+
+                          return (
+                              <button 
+                                  key={m.name} 
+                                  onClick={() => handleMoveAssignment(m)} 
+                                  disabled={isAlreadySelected}
+                                  style={{
+                                      display: 'block',
+                                      width: '100%',
+                                      textAlign: 'left',
+                                      padding: '5px',
+                                      margin: '2px 0',
+                                      border: '1px solid transparent',
+                                      borderRadius: '4px',
+                                      cursor: 'pointer',
+                                      backgroundColor: isAlreadySelected ? '#007bff' : 'white',
+                                      color: isAlreadySelected ? 'white' : 'black',
+                                      fontWeight: isAlreadySelected ? 'bold' : 'normal'
+                                  }}
+                              >
+                                  {m.name.toUpperCase()} {isAlreadySelected ? '(TAKEN)' : ''}
+                              </button>
+                          );
+                      })}
+                  </div>
+              </details>
+              
+              <button 
+                onClick={handleDeletePokemon} 
+                style={{ marginTop: '20px', backgroundColor: '#f44336', color: 'white', border: 'none', padding: '10px 20px', borderRadius: '4px', cursor: 'pointer' }}
+              >
+                Remove Pokémon 🗑️
+              </button>
+            </div>
+          ) : (
+            <PokemonSearch />
+          )}
         </div>
       </section>
     </div>
